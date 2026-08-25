@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Coordinator Touchpoints — Ticket Update</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* Ticket detail cards */
+    .ticket-details{
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .detail-item{
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--bg1);
+      border: 1px solid var(--border-light);
+    }
+    .detail-item .detail-label{
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .detail-item .detail-value{
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .detail-item select{
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    /* Action buttons row */
+    .action-btns{
+      display: flex;
+      gap: 12px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    /* Modal overlay */
+    .modal-overlay{
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-card{
+      background: var(--white);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+      max-width: 560px;
+      width: 100%;
+      max-height: 85vh;
+      overflow: auto;
+      padding: 28px;
+    }
+    .modal-card h3{
+      margin: 0 0 6px;
+      font-size: 18px;
+      color: var(--text);
+    }
+    .modal-card .muted{
+      margin-bottom: 16px;
+    }
+    .modal-card .form{
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .modal-card .field{
+      grid-column: span 1;
+    }
+    .modal-btns{
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    /* Actions history list */
+    .actions-history{
+      margin-top: 20px;
+    }
+    .actions-history h3{
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 12px;
+    }
+    .action-entry{
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: var(--bg1);
+      border: 1px solid var(--border-light);
+      margin-bottom: 10px;
+    }
+    .action-entry .action-meta{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .action-entry .action-meta .action-type{
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .action-entry .action-meta .action-date{
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .action-entry .action-text{
+      font-size: 13px;
+      color: var(--text);
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    .action-entry.parent-update .action-meta .action-type{
+      color: var(--orange);
+    }
+
+    /* Ticket logs timeline */
+    .ticket-logs{
+      margin-top: 24px;
+    }
+    .ticket-logs h3{
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 12px;
+    }
+    .log-timeline{
+      position: relative;
+      padding-left: 28px;
+    }
+    .log-timeline::before{
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 4px;
+      bottom: 4px;
+      width: 2px;
+      background: var(--border);
+      border-radius: 1px;
+    }
+    .log-item{
+      position: relative;
+      padding: 8px 0 16px;
+    }
+    .log-item::before{
+      content: '';
+      position: absolute;
+      left: -22px;
+      top: 12px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--white);
+      box-shadow: 0 0 0 2px var(--accent-border);
+    }
+    .log-item.log-create::before{ background: var(--success); box-shadow: 0 0 0 2px rgba(0,184,148,0.22); }
+    .log-item.log-action::before{ background: var(--accent); }
+    .log-item.log-parent::before{ background: var(--orange); box-shadow: 0 0 0 2px var(--orange-border); }
+    .log-item.log-status::before{ background: #9b59b6; box-shadow: 0 0 0 2px rgba(155,89,182,0.22); }
+    .log-item .log-date{
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .log-item .log-text{
+      font-size: 13px;
+      color: var(--text);
+      margin-top: 2px;
+    }
+    .no-logs{
+      font-size: 13px;
+      color: var(--muted);
+      padding: 12px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="navHolder"></div>
+
+    <div class="card">
+      <h2>Ticket Update</h2>
+      <p class="muted">Select a student and ticket to view and update details.</p>
+
+      <div class="form">
+        <div class="field span6">
+          <label>Student Name</label>
+          <select id="studentSelect" data-placeholder="Search by SR# or name..."></select>
+        </div>
+
+        <div class="field span6">
+          <label>Ticket</label>
+          <select id="ticketSelect" data-placeholder="Select ticket..." disabled></select>
+        </div>
+      </div>
+
+      <!-- Ticket Details (hidden until ticket selected) -->
+      <div id="detailsSection" style="display:none;">
+        <hr style="margin:20px 0; border:none; border-top:1px solid var(--border-light);" />
+
+        <div class="ticket-details" id="detailsGrid">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- Actions history -->
+        <div class="actions-history" id="actionsHistory"></div>
+
+        <!-- Ticket logs -->
+        <div class="ticket-logs" id="ticketLogs"></div>
+
+        <!-- Action buttons -->
+        <div class="action-btns">
+          <button id="takeActionBtn" class="btn primary" type="button">🎯 Take Action</button>
+          <button id="updateParentBtn" class="btn" type="button">📞 Update Parent</button>
+        </div>
+      </div>
+
+      <div id="msg" class="notice" style="display:none; margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <!-- Modal container (added dynamically) -->
+  <div id="modalRoot"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/ticketUpdate.js"></script>
+</body>
+</html>

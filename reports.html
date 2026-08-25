@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Coordinator Touchpoints — My Entries</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="navHolder"></div>
+
+    <div class="card">
+      <h2 id="pageHeading">My Entries</h2>
+      <p class="muted" id="pageSubtitle">Your entries. Filter by date range + objective. Search and export to Excel.</p>
+
+      <div class="form">
+        <!-- Row 1: Session / From / To -->
+        <div class="field span4">
+          <label>Session</label>
+          <select id="sessionFilter" data-placeholder="Select session..."></select>
+        </div>
+
+        <div class="field span4">
+          <label>From</label>
+          <input id="fromDate" type="date" />
+        </div>
+
+        <div class="field span4">
+          <label>To (Session end is exclusive)</label>
+          <input id="toDate" type="date" />
+        </div>
+
+        <!-- Admin-only: Coordinator filter -->
+        <div class="field span3" id="coordFilterWrap" style="display:none;">
+          <label>Coordinator</label>
+          <select id="coordFilter"><option value="">All</option></select>
+        </div>
+
+        <!-- Row 2: Objective + Search -->
+        <div class="field span3" id="objWrap">
+          <label>Objective</label>
+          <select id="objectiveFilter" data-placeholder="All"></select>
+        </div>
+
+        <div class="field span9">
+          <label>Search (Child / Name / Ticket)</label>
+          <input id="q" type="text" placeholder="Type and press Apply…" />
+        </div>
+
+        <div class="field span12">
+          <label>Actions</label>
+          <div class="row" style="gap:10px;flex-wrap:wrap;">
+            <button id="applyBtn" class="btn primary" type="button">Apply</button>
+            <button id="clearBtn" class="btn" type="button">Clear</button>
+            <button id="exportBtn" class="btn" type="button">Export XLSX</button>
+
+            <button id="todayBtn" class="btn" type="button">Today</button>
+            <button id="weekBtn" class="btn" type="button">This Week</button>
+            <button id="monthBtn" class="btn" type="button">This Month</button>
+          </div>
+        </div>
+
+        <div class="field span12">
+          <div class="pagination-row">
+            <div class="muted" id="meta"></div>
+            <div class="pagination-controls">
+              <button id="prevBtn" class="btn" type="button">Prev</button>
+              <div class="muted" id="pageInfo"></div>
+              <button id="nextBtn" class="btn" type="button">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="msg" class="notice" style="display:none;margin-top:12px;"></div>
+
+      <div class="tablewrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Child Name</th>
+              <th>Medium</th>
+              <th>Objective</th>
+              <th>Summary</th>
+              <th>Ticket Number</th>
+              <th>Ticket raised?</th>
+              <th id="ownerTh" style="display:none;">Owner</th>
+              <th>Timestamp</th>
+              <th>Name</th>
+              <th>Class</th>
+              <th>Section</th>
+              <th>SR Number</th>
+              <th>Week</th>
+              <th>Month</th>
+              <th>Year</th>
+              <th>Time</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script type="module" src="js/reports.js"></script>
+</body>
+</html>

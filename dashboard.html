@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Coordinator Touchpoints — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* ===== Greeting banner ===== */
+    .greeting-banner{
+      padding: 22px 24px;
+      border-radius: var(--radius-lg);
+      background: var(--gradient-primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      box-shadow: 0 6px 24px rgba(108,92,231,0.25);
+    }
+    .greeting-banner h2{
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .greeting-banner p{
+      margin: 4px 0 0;
+      font-size: 13px;
+      opacity: 0.85;
+    }
+    .greeting-emoji{
+      font-size: 38px;
+      line-height: 1;
+    }
+
+    /* ===== Counter cards ===== */
+    .counter-grid{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .counter-card{
+      flex: 1 1 140px;
+      min-width: 110px;
+      padding: 22px 14px;
+      border-radius: 16px;
+      background: var(--white);
+      border: 1px solid var(--border-light);
+      text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .counter-card:hover{
+      transform: translateY(-3px);
+      box-shadow: 0 10px 28px rgba(108,92,231,0.1);
+    }
+    .counter-card .counter-value{
+      font-size: 34px;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .counter-card .counter-label{
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      font-weight: 600;
+    }
+    .counter-card .counter-icon{
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+    .counter-card.purple .counter-value{ color: var(--accent); }
+    .counter-card.orange .counter-value{ color: #e67e22; }
+    .counter-card.blue   .counter-value{ color: #3498db; }
+    .counter-card.green  .counter-value{ color: var(--success); }
+
+    /* ===== Filter pills ===== */
+    .filter-pills{ display: flex; gap: 6px; flex-wrap: wrap; }
+    .filter-pills button{
+      padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+      background: var(--white); font-size: 12px; font-weight: 500;
+      font-family: inherit; cursor: pointer; color: var(--text); transition: all 0.2s;
+    }
+    .filter-pills button.active{
+      background: var(--accent); border-color: var(--accent); color: #fff;
+      box-shadow: 0 2px 8px rgba(108,92,231,0.25);
+    }
+    .filter-pills button:hover:not(.active){
+      background: var(--accent-bg); border-color: var(--accent);
+    }
+
+    /* ===== Section header ===== */
+    .section-header{
+      display: flex; justify-content: space-between; align-items: flex-start;
+      flex-wrap: wrap; gap: 10px; margin-bottom: 4px;
+    }
+    .section-header h2 .section-emoji{
+      margin-right: 6px;
+    }
+
+    /* ===== Leaderboard ===== */
+    .lb-list{
+      margin-top: 10px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .lb-header, .lb-row{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 8px;
+    }
+    .lb-header{
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--muted); font-weight: 600;
+      border-bottom: 2px solid var(--border-light);
+      position: sticky; top: 0; background: var(--white); z-index: 2;
+    }
+    .lb-row{
+      border-bottom: 1px solid var(--border-light);
+      font-size: 13px; color: var(--text);
+      transition: background 0.15s;
+    }
+    .lb-row:hover{ background: var(--accent-bg); }
+
+    .lb-rank{ flex: 0 0 34px; text-align: center; }
+    .lb-name{ flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .lb-name .lb-email{ display: block; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+    .lb-stat{ flex: 0 0 52px; text-align: center; font-weight: 600; }
+
+    .rank-badge{
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 50%;
+      font-size: 12px; font-weight: 700;
+    }
+    .rank-1{ background: none; font-size: 22px; }
+    .rank-2{ background: none; font-size: 22px; }
+    .rank-3{ background: none; font-size: 22px; }
+    .rank-n{ background: var(--bg2); color: var(--muted); font-size: 12px; }
+
+    /* ===== Mobile fixes ===== */
+    @media (max-width: 768px){
+      .greeting-banner{
+        padding: 18px 16px;
+        border-radius: var(--radius);
+      }
+      .greeting-banner h2{ font-size: 17px; }
+      .greeting-emoji{ font-size: 30px; }
+
+      .counter-grid{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .counter-card{
+        min-width: 0;
+        padding: 16px 10px;
+      }
+      .counter-card .counter-value{ font-size: 26px; }
+      .counter-card .counter-icon{ font-size: 18px; }
+
+      .filter-pills{
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+      }
+      .filter-pills button{
+        flex-shrink: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="navHolder"></div>
+
+    <div class="grid">
+
+      <!-- ===== Greeting ===== -->
+      <div class="greeting-banner span12" id="greetingBanner" style="grid-column:span 12;">
+        <div>
+          <h2 id="greetingText">Welcome back! 👋</h2>
+          <p id="greetingSub">Let's make today count.</p>
+        </div>
+        <div class="greeting-emoji">🚀</div>
+      </div>
+
+      <!-- ===== Ticket Overview ===== -->
+      <div class="card span12">
+        <div class="section-header">
+          <div>
+            <h2><span class="section-emoji">🎯</span>Ticket Overview</h2>
+            <p class="muted">Summary of ticket activity.</p>
+          </div>
+          <div class="filter-pills" id="ticketFilterPills">
+            <button data-range="week" class="active">This Week</button>
+            <button data-range="month">This Month</button>
+            <button data-range="year">This Year</button>
+            <button data-range="all">All Time</button>
+          </div>
+        </div>
+        <div class="counter-grid" id="ticketCounters">
+          <div class="counter-card purple">
+            <div class="counter-icon">🆕</div>
+            <div class="counter-value" id="cntNew">–</div>
+            <div class="counter-label">New</div>
+          </div>
+          <div class="counter-card orange">
+            <div class="counter-icon">⚡</div>
+            <div class="counter-value" id="cntAction">–</div>
+            <div class="counter-label">Action Taken</div>
+          </div>
+          <div class="counter-card blue">
+            <div class="counter-icon">📋</div>
+            <div class="counter-value" id="cntTotal">–</div>
+            <div class="counter-label">Total</div>
+          </div>
+          <div class="counter-card green">
+            <div class="counter-icon">✅</div>
+            <div class="counter-value" id="cntResolved">–</div>
+            <div class="counter-label">Resolved</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Ticket Leaderboard ===== -->
+      <div class="card span6">
+        <div class="section-header">
+          <div>
+            <h2><span class="section-emoji">🏆</span>Ticket Leaderboard</h2>
+            <p class="muted">Coordinators ranked by ticket activity.</p>
+          </div>
+          <div class="filter-pills" id="ticketLBFilter">
+            <button data-range="week" class="active">Week</button>
+            <button data-range="month">Month</button>
+            <button data-range="year">Year</button>
+            <button data-range="all">All</button>
+          </div>
+        </div>
+        <div class="lb-list" id="ticketLBList">
+          <div class="lb-header">
+            <div class="lb-rank">#</div>
+            <div class="lb-name">Coordinator</div>
+            <div class="lb-stat">Act.</div>
+            <div class="lb-stat">Res.</div>
+            <div class="lb-stat">Total</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Entries Leaderboard ===== -->
+      <div class="card span6">
+        <div class="section-header">
+          <div>
+            <h2><span class="section-emoji">📊</span>Entries Leaderboard</h2>
+            <p class="muted">Coordinators ranked by touchpoint entries.</p>
+          </div>
+          <div class="filter-pills" id="entriesLBFilter">
+            <button data-range="daily" class="active">Today</button>
+            <button data-range="monthly">This Month</button>
+            <button data-range="all">All Time</button>
+          </div>
+        </div>
+        <div class="lb-list" id="entriesLBList">
+          <div class="lb-header">
+            <div class="lb-rank">#</div>
+            <div class="lb-name">Coordinator</div>
+            <div class="lb-stat">Entries</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

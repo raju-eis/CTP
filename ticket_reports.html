@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Coordinator Touchpoints — Ticket Reports</title>
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <style>
+    /* ✅ IMPORTANT: make inline inputs/selects in table always visible */
+    .cellEdit, .cellSelect{
+      width: 100%;
+      min-width: 140px;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+    }
+    .cellEdit:disabled, .cellSelect:disabled{
+      opacity: .55;
+      cursor: not-allowed;
+      background: var(--bg1);
+    }
+
+    /* Google Sheets-style header filter */
+    th.filterable{
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th.filterable:hover{
+      background: var(--accent-bg);
+    }
+    th.filterable .filter-icon{
+      display: inline-block;
+      margin-left: 4px;
+      font-size: 10px;
+      opacity: 0.4;
+      vertical-align: middle;
+    }
+    th.filterable.active-filter .filter-icon{
+      opacity: 1;
+      color: var(--accent);
+    }
+
+    /* Filter popup */
+    .col-filter-popup{
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 100;
+      min-width: 220px;
+      max-width: 300px;
+      max-height: 360px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .col-filter-popup .sort-btns{
+      display: flex;
+      gap: 6px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .col-filter-popup .sort-btns button{
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--text);
+    }
+    .col-filter-popup .sort-btns button:hover{
+      background: var(--accent-bg);
+      border-color: var(--accent);
+    }
+    .col-filter-popup .filter-search{
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .col-filter-popup .filter-search input{
+      width: 100%;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .col-filter-popup .filter-actions{
+      display: flex;
+      gap: 6px;
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .col-filter-popup .filter-actions button{
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--text);
+    }
+    .col-filter-popup .filter-list{
+      overflow: auto;
+      max-height: 200px;
+      padding: 4px 8px;
+    }
+    .col-filter-popup .filter-item{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 6px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .col-filter-popup .filter-item:hover{
+      background: var(--accent-bg);
+    }
+    .col-filter-popup .filter-item input{
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+    }
+    .col-filter-popup .filter-apply{
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border-light);
+    }
+    .col-filter-popup .filter-apply button{
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--text);
+    }
+    .col-filter-popup .filter-apply .apply-btn{
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    @media (max-width: 768px){
+      .cellEdit, .cellSelect{
+        min-width: 120px;
+        padding: 10px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div id="navHolder"></div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Ticket Reports</h2>
+        <p class="muted">Click column headers to filter and sort. Some fields are read-only — use Ticket Update to modify.</p>
+
+        <div class="form">
+          <!-- Session / From / To -->
+          <div class="field span4">
+            <label>Session</label>
+            <select id="sessionFilter" data-placeholder="Select session..."></select>
+          </div>
+          <div class="field span4">
+            <label>From</label>
+            <input id="fromDate" type="date" />
+          </div>
+          <div class="field span4">
+            <label>To (end-exclusive)</label>
+            <input id="toDate" type="date" />
+          </div>
+
+          <!-- Search -->
+          <div class="field span12">
+            <label>Search (Ticket / Student / Category)</label>
+            <input id="q" type="text" placeholder="Type and press Apply..." />
+          </div>
+
+          <!-- Buttons -->
+          <div class="field span12">
+            <div class="row" style="justify-content:flex-end; gap:10px;">
+              <button id="applyBtn" class="btn primary" type="button">Apply</button>
+              <button id="clearBtn" class="btn" type="button">Clear</button>
+              <button id="exportBtn" class="btn" type="button">Export XLSX</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="msg" class="notice" style="display:none;"></div>
+
+        <div class="pagination-row" style="margin-top:10px;">
+          <div id="meta" class="muted"></div>
+          <div class="pagination-controls">
+            <button id="prevBtn" class="btn" type="button">Prev</button>
+            <div id="pageInfo" class="muted"></div>
+            <button id="nextBtn" class="btn" type="button">Next</button>
+          </div>
+        </div>
+
+        <div class="tablewrap" style="margin-top:10px;">
+          <table>
+            <thead id="tableHead">
+              <tr>
+                <th data-col="ticket_number">Ticket Number</th>
+                <th data-col="student_child_name">Student Name</th>
+                <th data-col="issue_raised_by">Issue Raised By</th>
+                <th data-col="department">Department</th>
+                <th data-col="subject">Subject</th>
+                <th data-col="category">Category</th>
+                <th>Description</th>
+                <th data-col="raised_at">Date</th>
+                <th data-col="reporter_email">Reporter</th>
+                <th>Mobile</th>
+
+                <th data-col="class_name">Class</th>
+                <th data-col="section">Section</th>
+                <th>Scholar</th>
+
+                <th data-col="point_of_contact">POC</th>
+                <th data-col="point_of_resolution">POR</th>
+
+                <th>Change Ownership</th>
+                <th>Follow-Up/Remarks</th>
+                <th>Next Follow Up Date</th>
+                <th data-col="ticket_status">Ticket Status</th>
+
+                <th>Ticket Action Comments</th>
+                <th>Ticket Parent Updates</th>
+                <th>#Actions this week</th>
+                <th>#Parent Updates this week</th>
+
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script type="module" src="js/ticketReports.js"></script>
+</body>
+</html>
