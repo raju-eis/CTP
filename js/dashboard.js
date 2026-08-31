@@ -137,13 +137,64 @@ async function loadTicketCounters() {
     return q;
   })();
 
-  const resolvedR = await (() => {
-    let q = sb.from("tickets").select("ticket_number", { count: "exact", head: true });
-    if (from) q = q.gte("raised_at", from.toISOString());
-    if (to) q = q.lt("raised_at", to.toISOString());
-    q = q.eq("ticket_status", "Resolved");
-    return q;
-  })();
+  // Fetch the resolved status label(s) from ticket_statuses table
+  // The last status (highest sort_order) is treated as "Resolved"
+  const { data: allStatuses } = await sb
+    .from("ticket_statuses")
+    .select("label,sort_order")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: false });
+
+  // Collect all status labels that could mean "resolved"
+  // Use the last status + any containing "resolved" or "closed"
+  const resolvedLabels = new Set();
+  if (allStatuses?.length) {
+    // The last status (highest sort_order) is always treated as resolved
+    resolvedLabels.add(allStatuses[0].label);
+    // Also add any containing "resolved" or "closed" (case-insensitive)
+    for (const s of allStatuses) {
+      const lower = (s.label || "").toLowerCase();
+      if (lower.includes("resolved") || lower.includes("closed")) {
+        resolvedLabels.add(s.label);
+      }
+    }
+  }
+
+  // Count resolved tickets
+  let resolvedCount = 0;
+  if (resolvedLabels.size > 0) {
+    const resolvedArr = Array.from(resolvedLabels);
+
+    if (from && to) {
+      const fromISO = from.toISOString();
+      const toISO = to.toISOString();
+      const fromDate = fromISO.slice(0, 10);
+      const toDate = toISO.slice(0, 10);
+
+      // Count tickets resolved in this period (by resolution_date)
+      const resolvedByDate = await sb.from("tickets")
+        .select("ticket_number", { count: "exact", head: true })
+        .in("ticket_status", resolvedArr)
+        .gte("resolution_date", fromDate)
+        .lt("resolution_date", toDate);
+
+      // Fallback: resolved tickets without resolution_date (use raised_at)
+      const resolvedNoDate = await sb.from("tickets")
+        .select("ticket_number", { count: "exact", head: true })
+        .in("ticket_status", resolvedArr)
+        .is("resolution_date", null)
+        .gte("raised_at", fromISO)
+        .lt("raised_at", toISO);
+
+      resolvedCount = (resolvedByDate.count ?? 0) + (resolvedNoDate.count ?? 0);
+    } else {
+      // "All time" — count all resolved
+      const resolvedAll = await sb.from("tickets")
+        .select("ticket_number", { count: "exact", head: true })
+        .in("ticket_status", resolvedArr);
+      resolvedCount = resolvedAll.count ?? 0;
+    }
+  }
 
   let actionQ = sb.from("touchpoints").select("ticket_number").eq("objective", "Ticket: Action");
   if (from) actionQ = actionQ.gte("touch_timestamp", from.toISOString());
@@ -154,13 +205,29 @@ async function loadTicketCounters() {
   // Animate counters
   animateCount(cntTotal, totalR.count ?? 0);
   animateCount(cntNew, newR.count ?? 0);
-  animateCount(cntResolved, resolvedR.count ?? 0);
+  animateCount(cntResolved, resolvedCount);
   animateCount(cntAction, actionTickets.size);
 }
 
 // -------------------- Ticket Leaderboard --------------------
 async function loadTicketLeaderboard() {
   const { from, to } = getDateRange(ticketLBRange);
+
+  // Fetch resolved status labels
+  const { data: allStatuses } = await sb
+    .from("ticket_statuses")
+    .select("label,sort_order")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: false });
+
+  const resolvedLabels = new Set();
+  if (allStatuses?.length) {
+    resolvedLabels.add(allStatuses[0].label); // last status = resolved
+    for (const s of allStatuses) {
+      const lower = (s.label || "").toLowerCase();
+      if (lower.includes("resolved") || lower.includes("closed")) resolvedLabels.add(s.label);
+    }
+  }
 
   let ticketQ = sb.from("tickets").select("ticket_number,reporter_email,ticket_status");
   if (from) ticketQ = ticketQ.gte("raised_at", from.toISOString());
@@ -184,7 +251,7 @@ async function loadTicketLeaderboard() {
     const c = getCoord(t.reporter_email);
     if (c) {
       c.total++;
-      if ((t.ticket_status || "").toLowerCase() === "resolved") c.resolved++;
+      if (resolvedLabels.has(t.ticket_status)) c.resolved++;
     }
   }
 
@@ -317,4 +384,13 @@ function wireFilterPills(container, callback, stateGetter, stateSetter) {
   wireFilterPills(ticketFilterPills, loadTicketCounters, () => ticketRange, v => { ticketRange = v; });
   wireFilterPills(ticketLBFilter, loadTicketLeaderboard, () => ticketLBRange, v => { ticketLBRange = v; });
   wireFilterPills(entriesLBFilter, loadEntriesLeaderboard, () => entriesLBRange, v => { entriesLBRange = v; });
+
+  // Wire clickable counter cards → redirect to Ticket Reports with filter
+  document.querySelectorAll("#ticketCounters .counter-card[data-filter]").forEach(card => {
+    card.addEventListener("click", () => {
+      const filterType = card.dataset.filter; // new | action | total | resolved
+      const url = `ticket_reports.html?dashFilter=${encodeURIComponent(filterType)}&dashRange=${encodeURIComponent(ticketRange)}`;
+      window.location.href = url;
+    });
+  });
 })();

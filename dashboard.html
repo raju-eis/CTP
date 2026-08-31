@@ -54,6 +54,8 @@
       border: 1px solid var(--border-light);
       text-align: center;
       transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      text-decoration: none;
     }
     .counter-card:hover{
       transform: translateY(-3px);
@@ -208,22 +210,22 @@
           </div>
         </div>
         <div class="counter-grid" id="ticketCounters">
-          <div class="counter-card purple">
+          <div class="counter-card purple" data-filter="new" id="cardNew">
             <div class="counter-icon">🆕</div>
             <div class="counter-value" id="cntNew">–</div>
             <div class="counter-label">New</div>
           </div>
-          <div class="counter-card orange">
+          <div class="counter-card orange" data-filter="action" id="cardAction">
             <div class="counter-icon">⚡</div>
             <div class="counter-value" id="cntAction">–</div>
             <div class="counter-label">Action Taken</div>
           </div>
-          <div class="counter-card blue">
+          <div class="counter-card blue" data-filter="total" id="cardTotal">
             <div class="counter-icon">📋</div>
             <div class="counter-value" id="cntTotal">–</div>
             <div class="counter-label">Total</div>
           </div>
-          <div class="counter-card green">
+          <div class="counter-card green" data-filter="resolved" id="cardResolved">
             <div class="counter-icon">✅</div>
             <div class="counter-value" id="cntResolved">–</div>
             <div class="counter-label">Resolved</div>

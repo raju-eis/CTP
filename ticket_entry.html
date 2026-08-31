@@ -45,8 +45,8 @@
           </div>
 
           <div class="field span6">
-            <label>Ticket Nature / SLA Tag</label>
-            <select id="tNature" data-placeholder="Select nature / SLA tag..."></select>
+            <label>Expected time for ticket resolution</label>
+            <select id="tNature" data-placeholder="Select expected resolution time..."></select>
           </div>
 
           <div id="incidentWrap" class="field span12" style="display:none;">
@@ -83,13 +83,7 @@
           </div>
           <!-- Mic button is attached dynamically by ticketEntry.js -->
 
-          <div class="field span4">
-            <label>Mobile Number (Optional)</label>
-            <input id="tMobile" type="text" placeholder="Optional" />
-          </div>
-
-          <div class="field span8">
-            <label>&nbsp;</label>
+          <div class="field span12">
             <div class="row" style="justify-content:flex-end; gap:10px;">
               <button id="tReset" class="btn" type="button">Reset</button>
               <button class="btn primary" type="submit">Submit Ticket</button>

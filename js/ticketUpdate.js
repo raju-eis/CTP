@@ -61,6 +61,19 @@ function daysBetween(d1, d2) {
   return Math.floor(ms / 86400000);
 }
 
+// ---- SLA parsing helpers ----
+function parseSLAtoHours(label) {
+  const lower = (label || "").toLowerCase().trim();
+  const numMatch = lower.match(/(\d+(?:\.\d+)?)/);
+  if (!numMatch) return 999999;
+  const num = parseFloat(numMatch[1]);
+  if (lower.includes("hr")) return num;
+  if (lower.includes("day")) return num * 24;
+  if (lower.includes("week")) return num * 24 * 7;
+  if (lower.includes("month")) return num * 24 * 30;
+  return 999999;
+}
+
 function isoWeekNumber(dateObj) {
   const now = new Date(dateObj);
   const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
@@ -133,7 +146,47 @@ async function loadTicketsForStudent(srNumber) {
     console.warn("Failed to load tickets:", error.message);
     return [];
   }
-  return data || [];
+
+  const tickets = data || [];
+
+  // --- Priority sort: fresh (0 actions) first, then by SLA ascending ---
+  // Fetch action counts for all these tickets
+  const ticketNumbers = tickets.map(t => t.ticket_number).filter(Boolean);
+  const actionCountMap = new Map();
+
+  if (ticketNumbers.length > 0) {
+    const chunkSize = 200;
+    for (let i = 0; i < ticketNumbers.length; i += chunkSize) {
+      const batch = ticketNumbers.slice(i, i + chunkSize);
+      const { data: actionData } = await sb
+        .from("touchpoints")
+        .select("ticket_number")
+        .in("ticket_number", batch)
+        .eq("objective", "Ticket: Action");
+      for (const a of (actionData || [])) {
+        actionCountMap.set(a.ticket_number, (actionCountMap.get(a.ticket_number) || 0) + 1);
+      }
+    }
+  }
+
+  // Sort: fresh (0 actions) first, then by SLA ascending
+  tickets.sort((a, b) => {
+    const actA = actionCountMap.get(a.ticket_number) || 0;
+    const actB = actionCountMap.get(b.ticket_number) || 0;
+    const freshA = actA === 0 ? 0 : 1;
+    const freshB = actB === 0 ? 0 : 1;
+    if (freshA !== freshB) return freshA - freshB; // fresh first
+    const slaA = parseSLAtoHours(a.ticket_nature);
+    const slaB = parseSLAtoHours(b.ticket_nature);
+    return slaA - slaB; // lower SLA first
+  });
+
+  // Store action counts on ticket objects for display
+  for (const t of tickets) {
+    t.__actionCount = actionCountMap.get(t.ticket_number) || 0;
+  }
+
+  return tickets;
 }
 
 // -------------------- Render ticket details --------------------
@@ -191,6 +244,10 @@ async function renderTicketDetails(ticket) {
     <div class="detail-item">
       <div class="detail-label">Description</div>
       <div class="detail-value" style="white-space:pre-wrap; max-width:400px;">${escText(ticket.description || "—")}</div>
+    </div>
+    <div class="detail-item">
+      <div class="detail-label">Expected Resolution Time</div>
+      <div class="detail-value">${escText(ticket.ticket_nature || "—")}</div>
     </div>
   `;
 
@@ -382,7 +439,14 @@ function openModal(mode) {
 
       // 2. Update ticket fields if changed
       const ticketPatch = {};
-      if (newStatus) ticketPatch.ticket_status = newStatus;
+      if (newStatus) {
+        ticketPatch.ticket_status = newStatus;
+        // Auto-set resolution_date when marking as resolved
+        if (newStatus.toLowerCase().includes("resolved")) {
+          const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+          ticketPatch.resolution_date = today;
+        }
+      }
       if (newOwnership) ticketPatch.change_ownership = newOwnership;
 
       if (Object.keys(ticketPatch).length > 0) {
@@ -471,7 +535,9 @@ function openModal(mode) {
           const cat = t.category || "No Category";
           const date = fmtDate(t.raised_at);
           const status = t.ticket_status || "Open";
-          return `<option value="${escAttr(t.ticket_number)}">${escText(t.ticket_number)} — ${escText(cat)} (${date}) [${status}]</option>`;
+          const sla = t.ticket_nature ? ` | SLA: ${t.ticket_nature}` : "";
+          const freshTag = (t.__actionCount === 0) ? " 🆕" : "";
+          return `<option value="${escAttr(t.ticket_number)}">${escText(t.ticket_number)} — ${escText(cat)} (${date}) [${status}]${sla}${freshTag}</option>`;
         }).join("");
 
       ticketSelect.disabled = false;

@@ -21,8 +21,8 @@ document.getElementById("backBtn")?.addEventListener("click", () => {
 
 function show(text, isErr = false) {
   msgEl.style.display = "block";
-  msgEl.style.borderColor = isErr ? "rgba(255,77,109,0.55)" : "rgba(124,92,255,0.55)";
-  msgEl.style.color = isErr ? "rgba(255,200,210,0.95)" : "rgba(255,255,255,0.72)";
+  msgEl.style.borderColor = isErr ? "rgba(255,77,109,0.55)" : "rgba(108,92,231,0.55)";
+  msgEl.style.color = isErr ? "#e74c3c" : "#2d1b69";
   msgEl.textContent = text;
 }
 function hideMsg() { msgEl.style.display = "none"; }

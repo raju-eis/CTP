@@ -23,7 +23,6 @@ const tIncBy = document.getElementById("tIncBy");
 const tIncLoc = document.getElementById("tIncLoc");
 
 const tDesc = document.getElementById("tDesc");
-const tMobile = document.getElementById("tMobile");
 const tReset = document.getElementById("tReset");
 const tMsg = document.getElementById("tMsg");
 const form = document.getElementById("ticketForm");
@@ -33,8 +32,8 @@ let deptMeta = new Map(); // label -> requires_subject
 
 function show(text, isError = false) {
   tMsg.style.display = "block";
-  tMsg.style.borderColor = isError ? "rgba(255,77,109,0.55)" : "rgba(124,92,255,0.55)";
-  tMsg.style.color = isError ? "rgba(255,200,210,0.95)" : "rgba(255,255,255,0.72)";
+  tMsg.style.borderColor = isError ? "rgba(255,77,109,0.55)" : "rgba(108,92,231,0.55)";
+  tMsg.style.color = isError ? "#e74c3c" : "#2d1b69";
   tMsg.textContent = text;
 }
 function hideMsg() { tMsg.style.display = "none"; }
@@ -176,11 +175,42 @@ async function loadCategories() {
 
       tCategory.innerHTML = `<option value=""></option>`;
 
-      // Ticket Nature / SLA Tag
+      // Expected time for ticket resolution (SLA) — sorted: hrs ascending then days ascending
       if (tNature) {
+        const slaData = (natureR.data || []).map(x => x.label);
+
+        // Parse SLA label into sortable hours value
+        function parseSLAtoHours(label) {
+          const lower = (label || "").toLowerCase().trim();
+          const numMatch = lower.match(/(\d+(?:\.\d+)?)/);
+          if (!numMatch) return 999999; // unknown format, sort last
+          const num = parseFloat(numMatch[1]);
+          if (lower.includes("hr")) return num;           // e.g. 24hrs, 48hrs
+          if (lower.includes("day")) return num * 24;     // e.g. 9 days, 90 days
+          if (lower.includes("week")) return num * 24 * 7;
+          if (lower.includes("month")) return num * 24 * 30;
+          return 999999;
+        }
+
+        // Sort: first by type (hrs before days), then by numeric value
+        function slaTypeOrder(label) {
+          const lower = (label || "").toLowerCase();
+          if (lower.includes("hr")) return 0;
+          if (lower.includes("day")) return 1;
+          if (lower.includes("week")) return 2;
+          if (lower.includes("month")) return 3;
+          return 4;
+        }
+
+        slaData.sort((a, b) => {
+          const typeA = slaTypeOrder(a), typeB = slaTypeOrder(b);
+          if (typeA !== typeB) return typeA - typeB;
+          return parseSLAtoHours(a) - parseSLAtoHours(b);
+        });
+
         tNature.innerHTML =
           `<option value=""></option>` +
-          ((natureR.data || []).map(x => `<option value="${x.label}">${x.label}</option>`).join(""));
+          slaData.map(x => `<option value="${x}">${x}</option>`).join("");
       }
 
       // Custom selects (search everywhere, especially student)
@@ -189,7 +219,7 @@ async function loadCategories() {
       enhanceSelect(tDept, { placeholder: "Select...", search: true });
       enhanceSelect(tSubject, { placeholder: "Select subject...", search: true });
       enhanceSelect(tCategory, { placeholder: "Select category...", search: true });
-      if (tNature) enhanceSelect(tNature, { placeholder: "Select nature / SLA tag..." });
+      if (tNature) enhanceSelect(tNature, { placeholder: "Select expected resolution time..." });
 
       // Attach mic button to Description
       if (tDesc) attachMicButton(tDesc);
@@ -322,7 +352,7 @@ form.addEventListener("submit", async (e) => {
 
       reporter_user_id: me.id,
       reporter_email: me.email,
-      reporter_mobile: (tMobile.value || "").trim() || null,
+      reporter_mobile: null,
 
       date_of_incident: tIncDate.value || null,
       time_of_incident: tIncTime.value || null,

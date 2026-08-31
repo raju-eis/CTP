@@ -1,10 +1,12 @@
-// js/teacherEntry.js
 import { sb } from "./supabaseClient.js";
 import { mountNav } from "./nav.js";
 import { getMe, getMyProfile } from "./auth.js";
 import { enhanceSelect, refreshSelect } from "./customSelect.js";
 import { withBusy, setBusyProgress } from "./busy.js";
 import { attachMicButton } from "./speechToText.js";
+
+// ✅ Replace this URL after deploying TeacherEntryEmail.gs as a Web App
+const TEACHER_EMAIL_NOTIFIER_URL = "YOUR_TEACHER_ENTRY_EMAIL_APPS_SCRIPT_URL_HERE";
 
 const entriesEl = document.getElementById("entries");
 const tpl = document.getElementById("entryTpl");
@@ -101,6 +103,7 @@ function blockRefs(block) {
     objective: q('select[data-field="objective"]'),
     summary: q('textarea[data-field="summary"]'),
 
+    // These may not exist in DOM anymore (removed from UI) but still referenced in logic
     empId: q('input[data-field="empId"]'),
     designation: q('input[data-field="designation"]'),
     email: q('input[data-field="email"]'),
@@ -320,6 +323,21 @@ form?.addEventListener("submit", async (e) => {
 
   show(`Saved ${payloads.length} entries ✅`);
   setTimeout(hideMsg, 1400);
+
+  // ✅ Fire email notification to each teacher (non-blocking)
+  if (TEACHER_EMAIL_NOTIFIER_URL && !TEACHER_EMAIL_NOTIFIER_URL.startsWith("YOUR_")) {
+    for (const p of payloads) {
+      if (!p.email) continue;
+      fetch(TEACHER_EMAIL_NOTIFIER_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(p),
+      })
+        .then(() => console.log("Teacher email notifier: request sent for", p.email))
+        .catch(err => console.warn("Teacher email notifier fetch failed:", err));
+    }
+  }
 
   entriesEl.innerHTML = "";
   createBlock(null);

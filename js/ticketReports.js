@@ -51,6 +51,12 @@ let sortCol = null;
 let sortDir = "asc"; // "asc" | "desc"
 let openFilterPopup = null; // currently open popup element
 
+// Dashboard redirect params
+const __dashURL = new URL(window.location.href);
+const __dashFilter = __dashURL.searchParams.get("dashFilter") || ""; // new | action | total | resolved
+const __dashRange = __dashURL.searchParams.get("dashRange") || ""; // week | month | year | all
+let __dashNewFilter = false; // special flag for "new" tickets (null/blank status)
+
 // -------------------- Busy wrapper --------------------
 let __busyDepth = 0;
 async function runBusy(title, fn) {
@@ -368,6 +374,11 @@ function buildServerQuery({ includeCount = false } = {}) {
     }
   }
 
+  // Dashboard "new" filter: tickets with null or empty status
+  if (__dashNewFilter) {
+    query = query.or("ticket_status.is.null,ticket_status.eq.");
+  }
+
   return query;
 }
 
@@ -547,6 +558,10 @@ async function loadPage() {
 
       return `
         <tr>
+          <td style="white-space:nowrap;">
+            <button class="btn primary updateBtn" data-ticket="${escAttr(t.ticket_number)}" data-sr="${escAttr(t.scholar_number)}" style="margin-bottom:4px;">Update</button>
+            <button class="btn danger delBtn" data-ticket="${escAttr(t.ticket_number)}">Delete</button>
+          </td>
           <td>${escText(t.ticket_number)}</td>
           <td>${escText(t.student_child_name)}</td>
           <td>${escText(t.issue_raised_by)}</td>
@@ -574,11 +589,6 @@ async function loadPage() {
           <td style="white-space:pre-wrap; max-width:420px;">${escText(e.derivedParent)}</td>
           <td>${escText(e.derivedActionWeek)}</td>
           <td>${escText(e.derivedParentWeek)}</td>
-
-          <td style="white-space:nowrap;">
-            <button class="btn primary updateBtn" data-ticket="${escAttr(t.ticket_number)}" data-sr="${escAttr(t.scholar_number)}" style="margin-bottom:4px;">Update</button>
-            <button class="btn danger delBtn" data-ticket="${escAttr(t.ticket_number)}">Delete</button>
-          </td>
         </tr>
       `;
     }).join("");
@@ -700,7 +710,98 @@ async function exportAllFiltered() {
   applySessionToDateInputs(fromDate, toDate, sess);
 
   initHeaderFilters();
+
+  // ---- Apply dashboard redirect filters ----
+  if (__dashFilter && __dashRange) {
+    // Compute date range from dashboard range
+    const now = new Date();
+    const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+    const tomorrowStart = new Date(todayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    function startOfWeekMonday(d) {
+      const x = new Date(d); x.setHours(0,0,0,0);
+      const day = x.getDay();
+      const diff = (day + 6) % 7;
+      x.setDate(x.getDate() - diff);
+      return x;
+    }
+
+    let rangeFrom = null, rangeTo = null;
+    switch (__dashRange) {
+      case "week":
+        rangeFrom = startOfWeekMonday(now); rangeTo = tomorrowStart; break;
+      case "month":
+        rangeFrom = new Date(now.getFullYear(), now.getMonth(), 1); rangeTo = tomorrowStart; break;
+      case "year":
+        rangeFrom = new Date(now.getFullYear(), 0, 1); rangeTo = tomorrowStart; break;
+      case "all":
+        rangeFrom = null; rangeTo = null; break;
+    }
+
+    // Format as local YYYY-MM-DD (avoid toISOString which converts to UTC and shifts dates)
+    function fmtLocalDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    }
+
+    // Set date inputs
+    if (rangeFrom) fromDate.value = fmtLocalDate(rangeFrom);
+    if (rangeTo) toDate.value = fmtLocalDate(rangeTo);
+
+    // Apply status-based filters
+    if (__dashFilter === "new") {
+      // New tickets = ticket_status is null or blank
+      // Use dedicated flag (handled in buildServerQuery with .or())
+      __dashNewFilter = true;
+    } else if (__dashFilter === "resolved") {
+      // Need to load all first, then filter for resolved
+      // We'll handle after loading tickets cache
+    }
+    // For "action" and "total" — no column filter needed, date range is enough
+    // "action" will be handled after cache load
+  }
+
   await loadPage();
+
+  // Post-load filter for dashboard redirects that need data inspection
+  if (__dashFilter === "resolved" && __allTicketsCache) {
+    // Find all resolved status values
+    const resolvedValues = new Set();
+    for (const t of __allTicketsCache) {
+      const status = String(t.ticket_status ?? "").trim();
+      if (status.toLowerCase().includes("resolved")) {
+        resolvedValues.add(status);
+      }
+    }
+    if (resolvedValues.size > 0) {
+      columnFilters.set("ticket_status", resolvedValues);
+      const statusTh = tableHead.querySelector('th[data-col="ticket_status"]');
+      if (statusTh) statusTh.classList.add("active-filter");
+      page = 0;
+      await loadPage();
+    }
+  } else if (__dashFilter === "action" && __allTicketsCache) {
+    // Filter to only tickets that have action touchpoints
+    // Fetch tickets with actions in the date range
+    const rangeFrom = fromDate.value ? new Date(fromDate.value) : null;
+    const rangeTo = toDate.value ? new Date(toDate.value) : null;
+
+    let actionQ = sb.from("touchpoints").select("ticket_number").eq("objective", "Ticket: Action");
+    if (rangeFrom) actionQ = actionQ.gte("touch_timestamp", rangeFrom.toISOString());
+    if (rangeTo) actionQ = actionQ.lt("touch_timestamp", rangeTo.toISOString());
+    const { data: actionData } = await actionQ;
+    const actionTicketNums = new Set((actionData || []).map(r => r.ticket_number).filter(Boolean));
+
+    if (actionTicketNums.size > 0) {
+      columnFilters.set("ticket_number", actionTicketNums);
+      const tnTh = tableHead.querySelector('th[data-col="ticket_number"]');
+      if (tnTh) tnTh.classList.add("active-filter");
+      page = 0;
+      await loadPage();
+    }
+  }
 })();
 
 // -------------------- Events --------------------
