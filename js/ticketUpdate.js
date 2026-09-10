@@ -1,7 +1,7 @@
 // js/ticketUpdate.js
 import { sb } from "./supabaseClient.js";
 import { mountNav } from "./nav.js";
-import { getMe, getMyProfile } from "./auth.js";
+import { getMe, getMyProfile, scopeTicketsToAssignee, ticketAssignedTo } from "./auth.js";
 import { enhanceSelect, refreshSelect } from "./customSelect.js";
 import { withBusy, setBusyProgress } from "./busy.js";
 import { attachMicButton } from "./speechToText.js";
@@ -26,6 +26,7 @@ let currentTicket = null;
 let meEmail = "";
 let meId = "";
 let meDisplayName = "";
+let meIsAdmin = false;
 
 // URL params for pre-selection (from Ticket Reports redirect)
 const __URL = new URL(window.location.href);
@@ -136,11 +137,17 @@ async function loadTicketsForStudent(srNumber) {
   const stu = students.find(s => s.sr_number === srNumber);
   if (!stu) return [];
 
-  const { data, error } = await sb
+  let query = sb
     .from("tickets")
     .select("*")
     .eq("scholar_number", srNumber)
     .order("raised_at", { ascending: false });
+
+  if (!meIsAdmin && meEmail) {
+    query = scopeTicketsToAssignee(query, meEmail);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.warn("Failed to load tickets:", error.message);
@@ -482,6 +489,7 @@ function openModal(mode) {
       meId = me.id;
       const profile = await getMyProfile(me.id);
       meDisplayName = profile.display_name || me.email;
+      meIsAdmin = profile?.role === "admin";
 
       setBusyProgress(null, "Loading students…");
       students = await fetchAll("students", "child_name,student_name,class_name,section,sr_number", "sr_number");
@@ -564,6 +572,11 @@ function openModal(mode) {
         const { data, error } = await sb.from("tickets").select("*").eq("ticket_number", tn).maybeSingle();
         if (error || !data) {
           show(error?.message || "Ticket not found.", true);
+          return;
+        }
+        if (!meIsAdmin && !ticketAssignedTo(data, meEmail)) {
+          show("Ticket not found.", true);
+          detailsSection.style.display = "none";
           return;
         }
         await renderTicketDetails(data);

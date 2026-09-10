@@ -1,7 +1,7 @@
 // js/ticketReports.js  — Rewritten with Google Sheets-style header filters
 import { sb } from "./supabaseClient.js";
 import { mountNav } from "./nav.js";
-import { getMe } from "./auth.js";
+import { getMe, scopeTicketsToAssignee } from "./auth.js";
 import { enhanceSelect, refreshSelect } from "./customSelect.js";
 import { withBusy, setBusyProgress } from "./busy.js";
 import {
@@ -358,12 +358,27 @@ function buildServerQuery({ includeCount = false } = {}) {
   query = query.gte("raised_at", clamped.from.toISOString());
   query = query.lt("raised_at", clamped.to.toISOString());
 
-  // Text search
+  // Text / "new" / assignee — one combined filter so multiple .or() don't clash
   const text = q.value.trim();
+  const andOrGroups = [];
   if (text) {
     const esc = text.replace(/,/g, " ");
-    query = query.or(
+    andOrGroups.push(
       `ticket_number.ilike.%${esc}%,student_child_name.ilike.%${esc}%,student_name.ilike.%${esc}%,category.ilike.%${esc}%,scholar_number.ilike.%${esc}%`
+    );
+  }
+  if (__dashNewFilter) {
+    andOrGroups.push("ticket_status.is.null,ticket_status.eq.");
+  }
+
+  if (!__isAdmin && __meEmail) {
+    query = scopeTicketsToAssignee(query, __meEmail, { andOrGroups });
+  } else if (andOrGroups.length === 1) {
+    query = query.or(andOrGroups[0]);
+  } else if (andOrGroups.length > 1) {
+    query = query.filter(
+      "and",
+      `(${andOrGroups.map((g) => `or(${g})`).join(",")})`
     );
   }
 
@@ -372,11 +387,6 @@ function buildServerQuery({ includeCount = false } = {}) {
     if (values.size > 0) {
       query = query.in(col, Array.from(values));
     }
-  }
-
-  // Dashboard "new" filter: tickets with null or empty status
-  if (__dashNewFilter) {
-    query = query.or("ticket_status.is.null,ticket_status.eq.");
   }
 
   return query;
