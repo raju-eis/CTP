@@ -1,6 +1,7 @@
 // js/dashboard.js — Gamified Dashboard
 import { sb } from "./supabaseClient.js";
 import { mountNav } from "./nav.js";
+import { scopeTicketsToAssignee } from "./auth.js";
 import { withBusy, setBusyProgress } from "./busy.js";
 
 // -------------------- DOM --------------------
@@ -23,6 +24,8 @@ const greetingSub = document.getElementById("greetingSub");
 let ticketRange = "week";
 let ticketLBRange = "week";
 let entriesLBRange = "daily";
+let __isAdmin = false;
+let __userEmail = "";
 
 // -------------------- Date helpers --------------------
 function startOfDay(d) {
@@ -120,11 +123,16 @@ function rankBadge(rank) {
 async function loadTicketCounters() {
   const { from, to } = getDateRange(ticketRange);
 
+  function scopeTicket(q) {
+    if (!__isAdmin && __userEmail) q = scopeTicketsToAssignee(q, __userEmail);
+    return q;
+  }
+
   function baseQ() {
     let q = sb.from("tickets").select("ticket_number", { count: "exact", head: true });
     if (from) q = q.gte("raised_at", from.toISOString());
     if (to) q = q.lt("raised_at", to.toISOString());
-    return q;
+    return scopeTicket(q);
   }
 
   const totalR = await baseQ();
@@ -133,7 +141,13 @@ async function loadTicketCounters() {
     let q = sb.from("tickets").select("ticket_number", { count: "exact", head: true });
     if (from) q = q.gte("raised_at", from.toISOString());
     if (to) q = q.lt("raised_at", to.toISOString());
-    q = q.or("ticket_status.is.null,ticket_status.eq.");
+    if (!__isAdmin && __userEmail) {
+      q = scopeTicketsToAssignee(q, __userEmail, {
+        andOrGroups: ["ticket_status.is.null,ticket_status.eq."],
+      });
+    } else {
+      q = q.or("ticket_status.is.null,ticket_status.eq.");
+    }
     return q;
   })();
 
@@ -172,26 +186,29 @@ async function loadTicketCounters() {
       const toDate = toISO.slice(0, 10);
 
       // Count tickets resolved in this period (by resolution_date)
-      const resolvedByDate = await sb.from("tickets")
+      let resolvedByDateQ = sb.from("tickets")
         .select("ticket_number", { count: "exact", head: true })
         .in("ticket_status", resolvedArr)
         .gte("resolution_date", fromDate)
         .lt("resolution_date", toDate);
+      const resolvedByDate = await scopeTicket(resolvedByDateQ);
 
       // Fallback: resolved tickets without resolution_date (use raised_at)
-      const resolvedNoDate = await sb.from("tickets")
+      let resolvedNoDateQ = sb.from("tickets")
         .select("ticket_number", { count: "exact", head: true })
         .in("ticket_status", resolvedArr)
         .is("resolution_date", null)
         .gte("raised_at", fromISO)
         .lt("raised_at", toISO);
+      const resolvedNoDate = await scopeTicket(resolvedNoDateQ);
 
       resolvedCount = (resolvedByDate.count ?? 0) + (resolvedNoDate.count ?? 0);
     } else {
       // "All time" — count all resolved
-      const resolvedAll = await sb.from("tickets")
+      let resolvedAllQ = sb.from("tickets")
         .select("ticket_number", { count: "exact", head: true })
         .in("ticket_status", resolvedArr);
+      const resolvedAll = await scopeTicket(resolvedAllQ);
       resolvedCount = resolvedAll.count ?? 0;
     }
   }
@@ -199,6 +216,7 @@ async function loadTicketCounters() {
   let actionQ = sb.from("touchpoints").select("ticket_number").eq("objective", "Ticket: Action");
   if (from) actionQ = actionQ.gte("touch_timestamp", from.toISOString());
   if (to) actionQ = actionQ.lt("touch_timestamp", to.toISOString());
+  if (!__isAdmin && __userEmail) actionQ = actionQ.eq("owner_email", __userEmail);
   const { data: actionData } = await actionQ;
   const actionTickets = new Set((actionData || []).map(r => r.ticket_number).filter(Boolean));
 
@@ -364,6 +382,9 @@ function wireFilterPills(container, callback, stateGetter, stateSetter) {
   await runBusy("Loading dashboard…", async () => {
     setBusyProgress(null, "Loading navigation…");
     const { profile } = await mountNav("dashboard");
+
+    __userEmail = profile?.email || "";
+    __isAdmin = profile?.role === "admin";
 
     // Set personalized greeting
     setGreeting(profile?.display_name);
