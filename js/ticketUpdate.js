@@ -221,6 +221,10 @@ async function renderTicketDetails(ticket) {
       <div class="detail-value">${escText(ticket.category || "—")}</div>
     </div>
     <div class="detail-item">
+      <div class="detail-label">Subject</div>
+      <div class="detail-value">${escText(ticket.subject || "—")}</div>
+    </div>
+    <div class="detail-item">
       <div class="detail-label">Department</div>
       <div class="detail-value">${escText(ticket.department || "—")}</div>
     </div>
@@ -246,7 +250,7 @@ async function renderTicketDetails(ticket) {
     </div>
     <div class="detail-item">
       <div class="detail-label">Ownership</div>
-      <div class="detail-value">${escText(ticket.change_ownership || "—")}</div>
+      <div class="detail-value">${escText(ticket.change_ownership || ticket.point_of_resolution || "—")}</div>
     </div>
     <div class="detail-item">
       <div class="detail-label">Description</div>
